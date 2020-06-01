@@ -381,7 +381,7 @@ class Board:
     def _getStringOfStone(self, fcoord):
         # In the union find structure, it is important to route all the nodes to the root
         # when querying the node. But in Python, using the successive array is really costly
-        # so this is not so clear that we need to use the successive collection of nodes
+        # so this is not so clear that we need to use the successive collection of nodes
         # Moreover, not rerouting the nodes may help for backtracking on the structure 
         successives = []
         while self._stringUnionFind[fcoord] != -1:
@@ -458,7 +458,7 @@ class Board:
             if self._board[fn] == Board._EMPTY:
                 return False
             string = self._getStringOfStone(fn)
-            if self._board[fn] == color: # check that we don't kill the whole zone
+            if self._board[fn] == color: # check that we don't kill the whole zone
                 if string not in libertiesFriends:
                     libertiesFriends[string] = self._stringLiberties[string] - 1
                 else:
@@ -571,10 +571,10 @@ class Board:
                         touched_whites += 1
             # here we have gathered all the informations about an empty area
             assert len(currentstring) == ssize
-            assert touched_blacks > 0 or touched_whites > 0
-            if touched_blacks == 0:
+            assert (self._nbBLACK == 0 and self._nbWHITE == 0) or touched_blacks > 0 or touched_whites > 0
+            if touched_blacks == 0 and touched_whites > 0:
                 only_whites += ssize
-            elif touched_whites == 0:
+            elif touched_whites == 0 and touched_blacks > 0:
                 only_blacks += ssize
             else:
                 others += ssize
@@ -593,9 +593,10 @@ class Board:
         values in the board.'''
         toreturn=""
         for i,c in enumerate(self._board):
-            toreturn += self._piece2str(c) + " " # +'('+str(i)+":"+str(self._stringUnionFind[i])+","+str(self._stringLiberties[i])+') '
-            if (i+1) % Board._BOARDSIZE == 0:
-                toreturn += "\n"
+            if ( self._stringUnionFind[i] != -1):
+                toreturn += self._piece2str(c) + " "  +'('+str(i)+":"+str(self._stringUnionFind[i])+","+str(self._stringLiberties[i])+') '
+                if (i+1) % Board._BOARDSIZE == 0:
+                    toreturn += "\n"
         toreturn += "Next player: " + ("BLACK" if self._nextPlayer == self._BLACK else "WHITE") + "\n"
         toreturn += str(self._nbBLACK) + " blacks and " + str(self._nbWHITE) + " whites on board\n"
         return toreturn
