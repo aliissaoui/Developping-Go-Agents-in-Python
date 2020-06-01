@@ -6,12 +6,16 @@ Right now, this class contains the copy of the randomPlayer. But you have to cha
 '''
 
 import time
-import Goban 
+import Goban
 import signal
+import random
+import threading
+import queue
 from random import choice
 from playerInterface import *
 from copy import deepcopy as cp
 from contextlib import contextmanager
+
 
 @contextmanager
 def timeout(time):
@@ -33,14 +37,17 @@ def timeout(time):
 def raise_timeout(signum, frame):
     raise TimeoutError
 
+
 class myPlayer(PlayerInterface):
-    ''' Example of a random player for the go. The only tricky part is to be able to handle
+    ''' 
+    Example of a random player for the go. The only tricky part is to be able to handle
     the internal representation of moves given by legal_moves() and used by push() and 
     to translate them to the GO-move strings "A1", ..., "J8", "PASS". Easy!
-
     '''
     turn = 0
-    
+    stonesTime, libertiesTime, edgesTime, captureTime, EulerTime = 0, 0, 0, 0, 0
+    zob_hash = []
+
     def __init__(self):
         self._board = Goban.Board()
         self._mycolor = None
@@ -50,29 +57,49 @@ class myPlayer(PlayerInterface):
 
     def getPlayerMove(self):
         self.turn += 1
-        print("-------------------------------- TURN ", self.turn, " --------------------" )
-        if (self._board._lastPlayerHasPassed and self._board.result() == "1-0"):
-                return 'PASS'
+        print("-------------------------------- TURN ",
+              self.turn, " --------------------")
+        if (self._board._lastPlayerHasPassed):
+            print("result before I play: ", self._board.result())
+            return 'PASS'
         if (self.turn == 1):
-            move = Goban.Board.name_to_flat('C7')
-            
+            if (self._mycolor == 1):
+                move = Goban.Board.name_to_flat('C6')
+            else:
+                move = Goban.Board.name_to_flat('G6')
+
+        elif (self.turn == 2):
+            if (self._mycolor == 1):
+                move = Goban.Board.name_to_flat('D4')
+            else:
+                move = Goban.Board.name_to_flat('F4')
+        elif (self.turn == 3):
+            if (self._mycolor == 1):
+                move = Goban.Board.name_to_flat('F6')
+            else:
+                move = Goban.Board.name_to_flat('D6')
+
         else:
             if self._board.is_game_over():
                 print("Referee told me to play but the game is over!")
-                return "PASS" 
+                return "PASS"
             t = time.time()
 
-            self._board.prettyPrint()
+            # self._board.prettyPrint()
             board_backup = cp(self._board)
-            
+
             #move, v = self.simpleEvaluation()
             #move, v = self.MaxMinCoup(self._board, 3)
             #move, v = self.AlphaBetaCoup(self._board, 2)
-            move, v = self.IDS_AB(30)
-           
+            # print(self._board.__str__())
+            #move, v = self.Negamax_coup(self._board, 1)
+            #move, v = self.IDS_AB(10)
+            move, v = self.IDS_NG(10)
+
             self._board = board_backup
-            print("############### ::::: ", Goban.Board.flat_to_name(move), "value: ", v, "   time: ", time.time() - t)
-    
+            print("############### ::::: ", Goban.Board.flat_to_name(
+                move), "value: ", v, "   time: ", time.time() - t)
+
         self._board.push(move)
 
         # New here: allows to consider internal representations of moves
@@ -80,12 +107,12 @@ class myPlayer(PlayerInterface):
         print("My current board :")
         self._board.prettyPrint()
         # move is an internal representation. To communicate with the interface I need to change if to a string
-        return Goban.Board.flat_to_name(move) 
+        return Goban.Board.flat_to_name(move)
 
     def playOpponentMove(self, move):
-        print("Opponent played ", move) # New here
+        print("Opponent played ", move)  # New here
         # the board needs an internal represetation to push the move.  Not a string
-        self._board.push(Goban.Board.name_to_flat(move)) 
+        self._board.push(Goban.Board.name_to_flat(move))
 
     def newGame(self, color):
         self._mycolor = color
@@ -96,125 +123,92 @@ class myPlayer(PlayerInterface):
             print("I won!!!")
         else:
             print("I lost :(!!")
-            
-            
-    # maximizing the number of stones *
-    def maxNbStones(self):
-        b = self._board
-        return b._nbBLACK - b._nbWHITE
-    
-    # maximizing the number of liberties
-    def liberties(self):
-        libertyBlack = 0
-        libertyWhite = 0
-        b = self._board
-        for fcoord in range( (b._BOARDSIZE -1) * 10 ) :
-            if b._stringLiberties[ fcoord ] != -1:
-                if b._board[ fcoord ] == 1:
-                    libertyBlack += b._stringLiberties[ fcoord ]
-                else:
-                    libertyWhite += b._stringLiberties[ fcoord ]
-        return libertyBlack - libertyWhite
 
-    # avoinding moves on the edge
+    """ To maximize the number of stones """
+
+    def maxNbStones(self):
+        t = time.time()
+        b = self._board
+        if (self._mycolor == 1):
+            r = b._nbBLACK - b._nbWHITE
+        else:
+            r = b._nbWHITE - b._nbBLACK
+
+        self.stonesTime += time.time() - t
+        return r
+
+    """ To maximize our libertieson the board """
+
+    def liberties(self):
+        t = time.time()
+        my_iberties = 0
+        op_liberties = 0
+        b = self._board
+        for fcoord in range((b._BOARDSIZE - 1) * 10):
+            if b._stringLiberties[fcoord] != -1:
+                if b._board[fcoord] == self._mycolor:
+                    my_iberties += b._stringLiberties[fcoord]
+                else:
+                    op_liberties += b._stringLiberties[fcoord]
+        self.libertiesTime += time.time()-t
+
+        r = my_iberties - op_liberties
+
+        self.stonesTime += time.time() - t
+        return r
+
+    """ To avoid the stones on the edges of the board. """
+
     def edges(self):
+        t = time.time()
         goal = 0
         b = self._board
         isOnBoard = True
-        coord = b.name_to_coord( b._historyMoveNames[-1] )
+        coord = b.name_to_coord(b._historyMoveNames[-1])
         #print("coord : ", coord)
         x, y = coord
-        if( x != -1 ):
-            
+        if(x != -1):
+
             neighbors = ((x+1, y), (x-1, y), (x, y+1), (x, y-1))
             for c in neighbors:
                 isOnBoard = isOnBoard and b._isOnBoard(c[0], c[1])
             if not isOnBoard:
                 #print("\n ",(x,y),"is on edge dude\n")
-                goal = - 10
+                goal = - 0.5
+        self.edgesTime += time.time() - t
         return goal
-    
-    # connecting stones
-    def stoneConnection(self, b):
-        f = []
-        
-        # put all the stones in f 
-        for fcoord in range( (b._BOARDSIZE-1) * 10 + 1):
-            f.append(fcoord)
-            
-        goal = 0
-        #
-        for fc in f:
-            color = self._board[fc]
-            if color == 0:
-                continue
-            
-            string = set([fc])
-            frontier = [fc]
-            
-            # 
-            while frontier:
-                current_fc = frontier.pop() 
-                string.add(current_fc)
-                i = b._neighborsEntries[current_fc]
-                while b._neighbors[i] != -1:
-                    fn = b._neighbors[i]
-                    i += 1
-                    if b._board[fn] == color and not fn in string:
-                        frontier.append(fn)
-                     
-            if color == 1:
-                goal += len(string) * (1 + len(string)/100)
-            elif color == 2:
-                goal -= len(string) * (1 + len(string)/100)
 
-        
-        for s in string:
-            if( s != fc):
-                f.remove(s)
-            
-        return goal
-    
-    
-    def EulerNumber(self, color):
+    """ Computes the number of Euler of a board,
+        By minimazing it, we create connected stones and eyes """
+
+    def EulerNumber(self):
+        t = time.time()
         b = self._board
         Qb1, Qb2, Qb3 = 0, 0, 0
         Qw1, Qw2, Qw3 = 0, 0, 0
-        
-        d = (b._BOARDSIZE-1) + 1
-        f = (b._BOARDSIZE-1) * 10 
-        black_set, white_set = [0,0,0,0], [0,0,0,0]
-        #print("from :", b.flat_to_name(d), "to: ", b.flat_to_name(f))
-        for a in range(d,f):
-            x,y = b.unflatten(a)
 
-         #   print("treating :", b.flat_to_name(a), "aka: ",x,y)
-            stones_set = [(x,y) , (x+1,y), (x, y-1), (x+1, y-1)]
-            """ stones_names = [0,0,0,0]
-            for i in range(len(stones_set)):
-                if b._isOnBoard(stones_set[i][0], stones_set[i][1]):
-                    stones_names[i] =  b.coord_to_name(stones_set[i])
-                else:
-                    stones_names[i] = "out" """
-            #print(stones_set)
+        end = (b._BOARDSIZE-1) * 10 + 1
+
+        my_set, op_set = [0, 0, 0, 0], [0, 0, 0, 0]
+        for a in range(end):
+
+            x, y = b.unflatten(a)
+
+        #   print("treating :", b.flat_to_name(a), "aka: ",x,y)
+            stones_set = [(x, y), (x+1, y), (x, y-1), (x+1, y-1)]
+
             for i in range(4):
-                if (b._isOnBoard(stones_set[i][0],stones_set[i][1] )):
-                    black_set[i] = (b[b.flatten(stones_set[i])] == color)
-                    white_set[i] = (b[b.flatten(stones_set[i])] == 2)
+                if (b._isOnBoard(stones_set[i][0], stones_set[i][1])):
+                    my_set[i] = (b[b.flatten(stones_set[i])] == self._mycolor)
+                    op_set[i] = (b[b.flatten(stones_set[i])]
+                                 == 3-self._mycolor)
                 else:
-                    black_set[i] = 0
-                    white_set[i] = 0
-            #if ( True in stones_set ):
-            #    print("treating :", b.flat_to_name(a), "aka: ",x,y)
-             #   print(stones_names)
-              #  print("corrected: ", stones_set)
-            s_b = sum(black_set)
-            s_w = sum(white_set)
-            """ if ( s_b != 0 ):
-                print("                         SUM Black: ", s_b)
-            if ( s_w != 0 ):
-                print("                         SUM White: ", s_w)"""
-            
+                    my_set[i] = 0
+                    op_set[i] = 0
+
+            s_b = sum(my_set)
+            s_w = sum(op_set)
+
             if s_b == 1:
                 #print("Q1 FOUUNNNNDDD")
                 Qb1 += 1
@@ -222,7 +216,7 @@ class myPlayer(PlayerInterface):
                 #print("Q3 FOUUNNNNDDD")
                 Qb3 += 1
             elif s_b == 2:
-                if ((black_set[0] and black_set[3]) or (black_set[1] and black_set[2])):
+                if ((my_set[0] and my_set[3]) or (my_set[1] and my_set[2])):
                     #print("Q2 FOUUNNNNDDD")
                     Qb2 += 1
             if s_w == 1:
@@ -230,95 +224,114 @@ class myPlayer(PlayerInterface):
             elif s_w == 3:
                 Qw3 += 1
             elif s_w == 2:
-                if ((white_set[0] and white_set[3]) or (white_set[1] and white_set[2])):
+                if ((op_set[0] and op_set[3]) or (op_set[1] and op_set[2])):
                     Qw2 += 1
-                    
+
         e_b = (Qb1 - Qb2 + 2*Qb3) / 4
         e_w = (Qw1 - Qw2 + 2*Qw3) / 4
+        r = e_b - e_w
+        self.EulerTime += time.time() - t
+        return r
 
-        """ print("Black Euler value: ", e_b)
-        
-        print("White Euler value: ", e_w)"""
-        return (e_b - e_w)
-        
+    """ Returns the difference between the number of stones we captured
+        and the stones the ennemie captured"""
 
+    def captured(self, b):
+        if (self._mycolor == 1):
+            r = 3*(b._capturedWHITE - b._capturedBLACK)
+        else:
+            r = 3*(b._capturedBLACK - b._capturedWHITE)
 
-    def evaluate(self,b):
+        return r
+
+    """ The evaluation function """
+
+    def evaluate(self, b):
 
         score = 0
         # !add coef to every goal
-        
-        
+
         # maximizing the number of stones *
         goal1 = self.maxNbStones()
-        score +=  goal1         
-        
+        score += goal1
+
         # maximizing the number of liberties
         goal2 = self.liberties()
-        score +=  goal2
-        
+        score += goal2
+
         # avoinding moves on the edge
         # !goal3 value
-        goal3 = self.edges() 
+        goal3 = self.edges()
         score += goal3
-        
-        # connecting stones
-        # dictionnaire de pairs racineString:longeur !can remove it
-        #goal4 = self.stoneConnection(self._board)
-        #score += 10 * goal4
-        
-        goal5 = self.EulerNumber(1)
+
+        # maximize the number of stones we capture
+        goal4 = self.captured(self._board)
+        score += goal4
+
+        # connecting stones and eyes making with euler number
+        goal5 = self.EulerNumber()
         score -= goal5
-        
-       # print("             goal1: ", goal1, " ///// goal2: ", goal2, " //// goal3: ", goal3, " //// goal5: ", goal5 , "score: ", score)
+
+        #print("             goal1: ", goal1, " ///// goal2: ", goal2, " //// goal3: ", goal3, " //// goal5: ", goal5 , "score: ", score)
         return score
         '''
         for key,value in d.items():
             print( key , value )
         '''
 
-    
     def simpleEvaluation(self):
+        """ A one level search for test """
         best, v = 0, -1000
         i = 0
 
         self._board.prettyPrint()
         for m in self._board.generate_legal_moves():
-            if ( m != -1):
+            if (m != -1):
                 self._board.push(m)
                 tmp = self.evaluate(self._board)
-                self._board.prettyPrint()
-                print("_____ coup: ", Goban.Board.flat_to_name(m)," of value: ", tmp)
-    
+                # self._board.prettyPrint()
+                # print("_____ coup: ", Goban.Board.flat_to_name(
+                #    m), " of value: ", tmp)
+
                 if tmp > v:
                     best = m
                     v = tmp
                 self._board.pop()
                 i += 1
-        print("-----------chosen: ",  Goban.Board.flat_to_name(best), " aka: ", best, v,"-----------")
+        # print("-----------chosen: ",  Goban.Board.flat_to_name(best),
+              # " aka: ", best, v, "-----------")
         return best, v
-       
-           
+
     # ALPHA BETA
-        
-    
     def AlphaBetaCoup(self, b, depth):
+        """ First level of MinMax search with Alpha Beta Pruning"""
         if b.is_game_over() or depth == 0:
             return None
-    
+
         v, coup = None, None
         for m in b.generate_legal_moves():
             b.push(m)
+            #t = time.time()
             ret = self.AlphaBeta(b, depth - 1, -1000, 1000)
-            #print("coup: ", Goban.Board.flat_to_name(m), "value : ", ret)
+            #print("Coup: ", b.flat_to_name(m), "valeur: ", ret, " temps: ", time.time()-t)
+
             if v is None or ret > v:
                 coup = m
                 v = ret
             b.pop()
-    
-        return (coup, v) 
-    
+        totalEvalTime = self.stonesTime + self.libertiesTime + \
+            self.edgesTime + self.captureTime + self.EulerTime
+        print("   Stones time : ", self.stonesTime,
+              "   Liberties time: ", self.libertiesTime,
+              "   Edges time: ", self.edgesTime,
+              "   Capture time: ", self.captureTime,
+              "   Euler Time: ", self.EulerTime,
+              "   Total: ", totalEvalTime)
+        self.stonesTime, self.libertiesTime, self.edgesTime, self.captureTime, self.EulerTime = 0, 0, 0, 0, 0
+        return (coup, v)
+
     def BetaAlpha(self, b, depth, alpha, beta):
+        """ MaxMin with Alpha beta pruning"""
         if b.is_game_over():
             res = b.result()
             if res == "1-0":
@@ -327,28 +340,30 @@ class myPlayer(PlayerInterface):
                 return -400
             else:
                 return 0
-    
+
         if depth == 0:
             e = self.evaluate(b)
             #print("depth : ", depth, "evaluation: ", e)
             return e
-    
+
         v = None
         for m in b.generate_legal_moves():
             b.push(m)
             ret = self.AlphaBeta(b, depth - 1, alpha, beta)
+            b.pop()
             if v is None or ret > v:
                 v = ret
             if alpha < v:
                 alpha = v
+            #print("IN BETA ALPHA alpha : ", alpha, " --- Beta : ", beta)
             if alpha >= beta:
-                b.pop()
+                #print("BETA CUT")
                 return beta
-            b.pop()
-        #print("depth: ", depth, "alpha: ", alpha)
+       # print("depth: ", depth, "beta: ", beta)
         return alpha
-    
+
     def AlphaBeta(self, b, depth, alpha, beta):
+        """ MinMax with Alpha beta pruning"""
         if b.is_game_over():
             res = b.result()
             if res == "1-0":
@@ -357,128 +372,184 @@ class myPlayer(PlayerInterface):
                 return -400
             else:
                 return 0
-    
+
         if depth == 0:
             e = self.evaluate(b)
-           # print("depth : ", depth, "evaluation: ", e)
+            #print("depth : ", depth, "evaluation: ", e)
             return e
-    
+
         v = None
         for move in b.generate_legal_moves():
-            b.push(move)    
+            b.push(move)
             ret = self.BetaAlpha(b, depth-1, alpha, beta)
-           # print("reeeet : ", ret)
+            b.pop()
+            #print("reeeet : ", ret)
             if v is None or ret < v:
                 v = ret
             if beta > v:
                 beta = v
+
+            #print(" IN ALPHA BETA: alpha : ", alpha, " --- Beta : ", beta)
             if alpha >= beta:
-                b.pop()
+                #print("ALPHA CUT")
                 return alpha
-            b.pop()
-       # print("depth: ", depth, "beta: ", beta)
+
+        #print("depth: ", depth, "beta: ", beta)
         return beta
-    
-    #### END ALPHA BETA
-    
-    
-    #### MIN MAX
-    
-    
-    
-    def MaxMinCoup(self, b, depth=3):
-        if b.is_game_over() or depth == 0:
-            return None
-    
-        v, coup = None, None
-        for m in b.generate_legal_moves():
-            b.push(m)
-            #b.prettyPrint()
-            #print("################################### coup: ", Goban.Board.flat_to_name(m), "###################################")
-            ret = self.MaxMin(b, depth - 1)
-            print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! coup: ", Goban.Board.flat_to_name(m), "value : ", ret, "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-            if v is None or ret > v:
-                coup = m
-                v = ret
-            b.pop()
-            #a = input()
-    
-        return (coup, v) 
 
-    def MaxMin(self, b, depth=3):
-        if b.is_game_over():
-            res = b.result()
-            if res == "1-0":
-                return 400
-            elif res == "0-1":
-                return -400
-            else:
-                return 0
-    
-        if depth == 0:
-            return self.evaluate(b)
-    
-        v = None
-        for m in b.generate_legal_moves():
-            #print("           test: ", Goban.Board.flat_to_name(m))
-            b.push(m)
-            #b.prettyPrint()
-            #a = input()            
-            ret = self.MinMax(b, depth - 1)
-            #print("                                 Sous coup: ", Goban.Board.flat_to_name(m), "value : ", ret,"                             ")
-            if v is None or ret > v:
-                v = ret
-            b.pop()
-    
-        return v
-    
-    def MinMax(self, b, depth=3):
-        if b.is_game_over():
-            res = b.result()
-            if res == "1-0":
-                return 400
-            elif res == "0-1":
-                return -400
-            else:
-                return 0
-    
-        if depth == 0:
-            return self.evaluate(b)
-    
-        v = None
-        for m in b.generate_legal_moves():
-            #print("           test: ", Goban.Board.flat_to_name(m))
-            b.push(m)
-            #b.prettyPrint()
-            #a = input()
-            ret = self.MaxMin(b, depth - 1)
-            if v is None or ret < v:
-                v = ret
-            b.pop()
-    
-        return v
-
-
-    #### FIN MIN MAX
-    
-    
     def IDS_AB(self, timeRange):
-    
-        #pour retourner une valeur au cas ou le temps est expiré.
+        """ Iterative deepening search for Alpha Beta"""
+
+        # pour retourner une valeur au cas ou le temps est expiré.
         best_move, v = choice(list(self._board.generate_legal_moves())), 0
         depth = 1
-        
-    
+
         with timeout(timeRange):
             while (True):
                 t = time.time()
                 #print("applying depth: ", depth, " on :\n", board)
                 move, v = self.AlphaBetaCoup(self._board, depth)
-                print("depth : ", depth, " time: ", time.time() -t, " move : ", Goban.Board.flat_to_name(move))
-                #if move != best_move:
+                print("depth : ", depth, " time: ", time.time() -
+                    t, " move : ", Goban.Board.flat_to_name(move))
+                # if move != best_move:
+                best_move = move
+                # print()
+
+                depth += 1
+
+        return best_move, v
+
+    def Negamax(self, b, depth, alpha, beta):
+        """ Negamax function with Alpha Beta Pruning ( without Transposition table) """
+        if b.is_game_over():
+            res = b.result()
+            if res == "1-0":
+                return 400
+            elif res == "0-1":
+                return -400
+            else:
+                return 0
+
+        if depth == 0:
+            e = self.evaluate(b)
+            return e
+
+        best_move, max_score = None, -1000
+        moves = b.generate_legal_moves()
+        for move in moves:
+            b.push(move)
+            score = -self.Negamax(b, depth-1, -beta, -alpha)
+            b.pop()
+
+            if best_move is None or score >= max_score:
+                best_move = move
+                max_score = score
+
+            alpha = max(alpha, score)
+
+                #print(" IN ALPHA BETA: alpha : ", alpha, " --- Beta : ", beta)
+            if alpha >= beta:
+                #print("ALPHA CUT")
+                return alpha
+
+        return alpha
+
+    def Negamax_tb(self, b, depth, alpha, beta):
+        """ Negamax function with Alpha Beta Pruning with a Transposition table """
+        if b.is_game_over():
+            res = b.result()
+            if res == "1-0":
+                return 400
+            elif res == "0-1":
+                return -400
+            else:
+                return 0
+
+        if depth == 0:
+            e = self.evaluate(b)
+            return e
+
+        best_move, max_score = None, -1000
+        moves = b.generate_legal_moves()
+        for move in moves:
+            b.push(move)
+            score = -self.Negamax(b, depth-1, -beta, -alpha)
+            b.pop()
+
+            if best_move is None or score >= max_score:
+                best_move = move
+                max_score = score
+
+            alpha = max(alpha, score)
+
+            #print(" IN ALPHA BETA: alpha : ", alpha, " --- Beta : ", beta)
+            if alpha >= beta:
+                #print("ALPHA CUT")
+                return alpha
+
+        return alpha
+
+    """ first level of negamax search"""
+
+    def Negamax_coup(self, b, depth):
+        if b.is_game_over() or depth == 0:
+            return None
+
+        v, coup = None, None
+        for m in b.generate_legal_moves():
+            b.push(m)
+           # t = time.time()
+            ret = self.Negamax(b, depth - 1, -1000, 1000)
+            #print("Coup: ", b.flat_to_name(m), "valeur: ", ret, " temps: ", time.time()-t)
+
+            if v is None or ret > v:
+                coup = m
+                v = ret
+            b.pop()
+        return (coup, v)
+
+    def IDS_NG(self, timeRange):
+        """ Iterative deepening search for NegaMax"""
+
+        # pour retourner une valeur au cas ou le temps est expiré.
+        best_move, v = choice(list(self._board.generate_legal_moves())), 0
+        depth = 1
+
+        with timeout(timeRange):
+            while (True):
+                t = time.time()
+                #print("applying depth: ", depth, " on :\n", board)
+                move, v = self.Negamax_coup(self._board, depth)
+                print("depth : ", depth, " time: ", time.time() -
+                      t, " move : ", Goban.Board.flat_to_name(move))
+                # if move != best_move:
                 best_move = move
                # print()
-                
+
                 depth += 1
-                    
+
         return best_move, v
+
+    def init_zobrist_Hash(self, b):
+        self.zob_hash = [[0 for x in range(self._board._BOARDSIZE)] for y in range(
+            self._board._BOARDSIZE)]
+        for i in range((b._BOARDSIZE - 1) * 10):
+            for j in range(2):
+                self.zob_hash[i][j] = random.getrandbits(32)
+
+    def zobrist_hash(self, b):
+        h = 0
+        for i in range((b._BOARDSIZE - 1) * 10):
+            if (b[i] == 1):
+                h ^= self.zob_hash[i][b[i]+1]
+        return h
+
+    def zob_narrowing(self, tt, alpha, beta):
+        if tt.bound == tt.BOUND_LOWER:  # was entry.score >= beta
+            alpha = max(alpha, tt.score)
+        elif tt.bound == tt.BOUND_UPPER:  # was entry.score <= alpha
+            beta = min(beta, tt.score)
+        return alpha, beta
+
+    def zob_is_exact(self, tt):
+        return tt.bound == tt.BOUND_EXACT
