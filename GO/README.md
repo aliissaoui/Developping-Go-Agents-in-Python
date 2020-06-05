@@ -61,7 +61,7 @@ L'ouverture:
 - negaMax.py    :   Ce fichier contient l'implémentation de la fonction de recherche NegaMax ( se basant sur l'AlphaBeta précédent ) avec une
                     profondeur spécifiée dans myPlayer.py
 
-- alphaBetaThreaded.py : Malheureusement, on ne savait pas que l'utilisation du multiprocessing est interdite, on l'avait quand même    
+- abThreadedPlayer.py : Malheureusement, on ne savait pas que l'utilisation du multiprocessing est interdite, on l'avait quand même    
                          implémenté.
                      Le principe étant de créer, dès la première itération de AlphaBetaCoup, un procéssus à chaque legal_move est de faire le calcul dans ce processus. Cette implémentation nous a beaucoup amélioré la vitesse des calculs, par exemple dans un petit teste on avait au début du jeu:            
                                         
