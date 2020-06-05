@@ -49,7 +49,6 @@ class myPlayer(PlayerInterface):
         e = False
         
 
-        # Récupération des ouvertures.
         if ( self._turn == 1 and c == "B"):
             move = Goban.Board.name_to_flat('E5')
 
@@ -84,19 +83,17 @@ class myPlayer(PlayerInterface):
 
             print("time: ", self._gametime)
             n = len(self._board.generate_legal_moves())
-
-            # Iterative deepening dépendant de tours, du temps restant et du nombre des moves légals.
             if ( self._gametime > 290 ):
                 if ( n < 10 ):
-                    move, v = self.IDS.AB.AlphaBetaCoup(self._board, 2, self._turn)
+                    move, v = self.IDS.NG.Negamax_coup(self._board, 2, self._turn)
                 else:
-                    move, v = self.IDS.AB.AlphaBetaCoup(self._board, 1, self._turn)
+                    move, v = self.IDS.NG.Negamax_coup(self._board, 1, self._turn)
             elif(self._turn < 20):
-                move, v = self.IDS.IDS_AB(self._board, 4, self._turn)
+                move, v = self.IDS.IDS_NG(self._board, 4, self._turn)
             elif(self._turn < 35):
-                move, v = self.IDS.IDS_AB(self._board, 6, self._turn)
+                move, v = self.IDS.IDS_NG(self._board, 6, self._turn)
             else:
-                move, v = self.IDS.IDS_AB(self._board, 7, self._turn)
+                move, v = self.IDS.IDS_NG(self._board, 7, self._turn)
 
             self._board = board_backup
 

@@ -62,8 +62,6 @@ class Eval():
         self.edgesTime += time.time() - t
         return goal
 
-    """ Computes the number of Euler of a board,
-        By minimazing it, we create connected stones and eyes """
     
     def stoneConnection(self, b):
         f = []
@@ -105,6 +103,8 @@ class Eval():
         return goal
     
 
+    """ Computes the number of Euler of a board,
+        By minimazing it, we create connected stones and eyes """   
     def EulerNumber(self, b):
         t = time.time()
         Qb1, Qb2, Qb3 = 0, 0, 0
@@ -168,39 +168,34 @@ class Eval():
     def evaluate(self, b):
 
         score = 0
-        # !add coef to every goal
 
-        # maximizing the number of stones *
+        # Maximiser le nombre de mes pions
         goal1 = self.maxNbStones(b)
         score += 10*goal1
 
-        # maximizing the number of liberties
+        # Maximiser le nombre de mes libertés
         goal2 = self.liberties(b)
         score += goal2
 
-        # avoinding moves on the edge
-        # !goal3 value
+        # Eviter les bordures du plateau
         goal3 = self.edges(b)
         score += goal3
 
+        # Joueur le plus possible au milieu
         goal31 = self.manhattan_dist_to_center(b)
         score -= goal31
 
-        # maximize the number of stones we capture
+        # maximize le nombre des pions qu'on capture
         goal4 = self.captured(b)
         score += 8*goal4
 
+        # maximiser le nombre des pions connectés
         #goal5 = self.stoneConnection(b)
         #score += goal5
         
-        # connecting stones and eyes making with euler number
+        # maximiser le nombre des pions connectés et des cercles crées
         goal6 = self.EulerNumber(b)
         score -= goal6
 
-        #print("             goal1: ", goal1, " ///// goal2: ", goal2, " //// goal3: ", goal3, " //// goal5: ", goal5 , "score: ", score)
         return score
-        '''
-        for key,value in d.items():
-            print( key , value )
-        '''
 

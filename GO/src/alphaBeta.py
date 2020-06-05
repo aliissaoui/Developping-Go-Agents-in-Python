@@ -9,13 +9,14 @@ class AlphaBeta():
         self._eval = eval.Eval(color)
 
     def AlphaBetaCoup(self, b, depth, turn):
-        """ First level of MinMax search with Alpha Beta Pruning"""
+        """ Premier niveau de Minmax avec Alpha Beta """
         if b.is_game_over() or depth == 0:
             return None
 
         v, coup = None, None
         self._nodes = 0
         for m in b.generate_legal_moves():
+            # éviter les bordures prendant premiers tours du jeu.
             if ( turn < 7):
                 x,y = b.unflatten(m)
                 if ( x < 2 or y < 2 or x >= b._BOARDSIZE-2 or y >= b._BOARDSIZE-2):
@@ -39,7 +40,7 @@ class AlphaBeta():
     def AlphaBeta(self, b, depth, alpha, beta):
         self._nodes += 1
         
-        """ MinMax with Alpha beta pruning"""
+        """ MinMax avec Alpha beta pruning"""
         if b.is_game_over():
             res = b.result()
             if res == "1-0":
@@ -71,7 +72,7 @@ class AlphaBeta():
 
     def BetaAlpha(self, b, depth, alpha, beta):
         self._nodes += 1
-        """ MaxMin with Alpha beta pruning"""
+        """ MaxMin avec Alpha beta pruning"""
         if b.is_game_over():
             res = b.result()
             if res == "1-0":
