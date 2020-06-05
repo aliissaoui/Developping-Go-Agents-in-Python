@@ -86,15 +86,15 @@ class myPlayer(PlayerInterface):
 
             if ( self._gametime > 290 ):
                 if ( n < 10 ):
-                    move, v = self.IDS.ABT.AlphaBetaCoupThreaded(self._board, 2, self._turn)
+                    move, v = self.IDS.AB.AlphaBetaCoup(self._board, 2, self._turn)
                 else:
-                    move, v = self.IDS.ABT.AlphaBetaCoupThreaded(self._board, 1, self._turn)
+                    move, v = self.IDS.AB.AlphaBetaCoup(self._board, 1, self._turn)
             elif(self._turn < 20):
-                move, v = self.IDS.IDS_AB_threaded(self._board, 4, self._turn)
+                move, v = self.IDS.IDS_AB_threaded(self._board, 4)
             elif(self._turn < 35):
-                move, v = self.IDS.IDS_AB_threaded(self._board, 6, self._turn)
+                move, v = self.IDS.IDS_AB_threaded(self._board, 6)
             else:
-                move, v = self.IDS.IDS_AB_threaded(self._board, 7, self._turn)
+                move, v = self.IDS.IDS_AB_threaded(self._board, 7)
 
             self._board = board_backup
 
