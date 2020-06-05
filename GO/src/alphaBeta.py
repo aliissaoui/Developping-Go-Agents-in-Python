@@ -42,7 +42,6 @@ class AlphaBeta():
         """ MinMax with Alpha beta pruning"""
         if b.is_game_over():
             res = b.result()
-            print("res: ", res)
             if res == "1-0":
                 r = - ((-1)**self._mycolor) * self._maxscore
             elif res == "0-1":
@@ -74,9 +73,7 @@ class AlphaBeta():
         self._nodes += 1
         """ MaxMin with Alpha beta pruning"""
         if b.is_game_over():
-            print("wa GAMEE OVVEEERR !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
             res = b.result()
-            print("res: ", res)
             if res == "1-0":
                 r = - ((-1)**self._mycolor) * self._maxscore
             elif res == "0-1":

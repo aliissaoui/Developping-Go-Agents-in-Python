@@ -30,7 +30,6 @@ def raise_timeout(signum, frame):
 class IDS():
 
     def __init__(self, color):
-        print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!color: ", color)
         self._mycolor = color
         self.AB = alphaBeta.AlphaBeta(color)
         self.NG = negaMax.NegaMax(color)
@@ -48,8 +47,8 @@ class IDS():
                 while (True):
                     t = time.time()
                     move, v = self.AB.AlphaBetaCoup(b, depth, turn)
-                    print("depth : ", depth, " time: ", time.time() -
-                        t, " move : ", b.flat_to_name(move))
+                    #print("depth : ", depth, " time: ", time.time() -
+                    #    t, " move : ", b.flat_to_name(move))
                     best_move = move
 
                     depth += 1
@@ -67,8 +66,8 @@ class IDS():
             while (True):
                 t = time.time()
                 move, v = self.NG.Negamax_coup(b, depth, turn)
-                print("depth : ", depth, " time: ", time.time() -
-                        t, " move : ", b.flat_to_name(move))
+                #print("depth : ", depth, " time: ", time.time() -
+                #        t, " move : ", b.flat_to_name(move))
                 best_move = move
 
                 depth += 1
@@ -87,8 +86,8 @@ class IDS():
             while (True):
                 t = time.time()
                 move, v = self.ABT.AlphaBetaCoupThreaded(b, depth)
-                print("depth : ", depth, " time: ", time.time() -
-                    t, " move : ", b.flat_to_name(move))
+                #print("depth : ", depth, " time: ", time.time() -
+                #    t, " move : ", b.flat_to_name(move))
                 best_move = move
                 depth += 1
         return best_move, v
@@ -99,7 +98,7 @@ class IDS():
             t = time.time()
 
             move, v = self.ABT.AlphaBetaCoupThreaded(b, depth)
-            print("depth : ", depth, " time: ", time.time() - t, " move : ", b.flat_to_name(move))
+            #print("depth : ", depth, " time: ", time.time() - t, " move : ", b.flat_to_name(move))
             
             best_move = move
             results['move'], results['value'] = move, v
@@ -121,6 +120,6 @@ class IDS():
             p.terminate()
             p.join()
         
-        print("move, value: ", results['move'], results['value'])
+        #print("move, value: ", results['move'], results['value'])
         return results['move'], results['value']
 
