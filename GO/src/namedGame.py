@@ -42,7 +42,6 @@ stringio = StringIO()
 wrongmovefrom = 0
 
 while not b.is_game_over():
-    #a = input("next")   
     print("Referee Board:")
     b.prettyPrint() 
     print("Before move", nbmoves)
